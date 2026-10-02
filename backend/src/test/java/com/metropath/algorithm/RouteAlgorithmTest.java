@@ -1,11 +1,15 @@
 package com.metropath.algorithm;
 
 import com.metropath.graph.MetroGraph;
+import com.metropath.model.AlgorithmEvent;
 import com.metropath.model.RouteRequest;
 import com.metropath.model.RouteResult;
+import com.metropath.model.VisualizationResult;
 import com.metropath.service.RouteService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -33,10 +37,11 @@ public class RouteAlgorithmTest {
         assertTrue(res.getStops() > 0);
         assertTrue(res.getTime() > 0);
         assertTrue(res.getDistance() > 0);
-        // FASTEST now routes via Egmore->Guindy Orange Line express (19 min, 16.6 km)
-        // instead of the Blue Line local path (24 min, 15.4 km)
         assertTrue(res.getStations().contains("Egmore"), "Fastest route must pass through Egmore (Orange Line express)");
         assertTrue(res.getStations().contains("Alandur"));
+        assertEquals(5, res.getStops());
+        assertEquals(19, res.getTime());
+        assertEquals(16.6, res.getDistance(), 0.1);
         System.out.println("Test 1 (Fastest): Time=" + res.getTime() + " mins, Stops=" + res.getStops() + ", Dist=" + res.getDistance() + "km, Path=" + res.getStations());
     }
 
@@ -49,7 +54,9 @@ public class RouteAlgorithmTest {
         assertEquals("Chennai Central", res.getSource());
         assertEquals("Chennai International Airport", res.getDestination());
         assertEquals("Dijkstra - Shortest Distance", res.getAlgorithmUsed());
-        assertTrue(res.getDistance() > 0);
+        assertEquals(10, res.getStops());
+        assertEquals(24, res.getTime());
+        assertEquals(15.4, res.getDistance(), 0.1);
         System.out.println("Test 2 (Shortest Distance): Dist=" + res.getDistance() + " km, Time=" + res.getTime() + " mins");
     }
 
@@ -62,9 +69,9 @@ public class RouteAlgorithmTest {
         assertEquals("Chennai Central", res.getSource());
         assertEquals("Chennai International Airport", res.getDestination());
         assertEquals("BFS - Fewest Stops", res.getAlgorithmUsed());
-        // Orange Line express gives a 5-hop path (Central->Egmore->Guindy->Alandur->Meenambakkam->Airport)
-        // which is fewer than the 10-hop Blue Line path
         assertEquals(5, res.getStops());
+        assertEquals(19, res.getTime());
+        assertEquals(16.6, res.getDistance(), 0.1);
         System.out.println("Test 3 (Fewest Stops): Stops=" + res.getStops() + ", Path=" + res.getStations());
     }
 
@@ -82,7 +89,6 @@ public class RouteAlgorithmTest {
 
     @Test
     void test5_RouteWithInterchange_KoyambeduToAirport() {
-        // Koyambedu is on Green Line, Airport is on Blue Line. Interchange at Alandur!
         RouteRequest req = new RouteRequest("Koyambedu", "Chennai International Airport", "FASTEST");
         RouteResult res = routeService.calculateRoute(req);
 
@@ -91,6 +97,9 @@ public class RouteAlgorithmTest {
         assertEquals("Chennai International Airport", res.getDestination());
         assertTrue(res.getInterchanges() >= 1, "Should have at least 1 interchange between Green and Orange/Blue lines");
         assertTrue(res.getStations().contains("Alandur"), "Route should pass through Alandur interchange");
+        assertEquals(6, res.getStops());
+        assertEquals(18, res.getTime());
+        assertEquals(13.7, res.getDistance(), 0.1);
         System.out.println("Test 5 (Koyambedu -> Airport with Interchange): Interchanges=" + res.getInterchanges() + ", Lines=" + res.getLines() + ", Path=" + res.getStations());
     }
 
@@ -101,13 +110,6 @@ public class RouteAlgorithmTest {
         assertEquals("Source and destination must be different.", ex.getMessage());
     }
 
-    /**
-     * CORE VIVA TEST: Verifies that FASTEST and SHORTEST_DISTANCE produce DIFFERENT routes.
-     * This is the key demonstration that Dijkstra correctly uses different edge weights.
-     * Central -> Airport:
-     *   FASTEST:  Orange Line express  -> 5 stops, ~19 min, ~16.6 km (faster but longer)
-     *   SHORTEST: Blue Line local      -> 10 stops, ~24 min, ~15.4 km (slower but shorter)
-     */
     @Test
     void test7_DijkstraModesDifferentRoutes_CentralToAirport() {
         RouteRequest fastReq = new RouteRequest("Chennai Central", "Chennai International Airport", "FASTEST");
@@ -119,30 +121,16 @@ public class RouteAlgorithmTest {
         assertNotNull(fast);
         assertNotNull(shortest);
 
-        // THE KEY ASSERTION: the two modes must produce genuinely different routes
         assertNotEquals(fast.getStations(), shortest.getStations(),
             "FASTEST and SHORTEST_DISTANCE must return different station sequences for Central->Airport");
 
-        // FASTEST is quicker in time
         assertTrue(fast.getTime() < shortest.getTime(),
             "Fastest route must have lower time than shortest-distance route");
 
-        // SHORTEST_DISTANCE is shorter in km
         assertTrue(shortest.getDistance() < fast.getDistance(),
             "Shortest-distance route must have lower km than fastest route");
-
-        System.out.println("=== VIVA DEMO: Dijkstra Mode Comparison (Central -> Airport) ===");
-        System.out.println("FASTEST  : " + fast.getStops() + " stops, " + fast.getTime() + " min, " + fast.getDistance() + " km | Path: " + fast.getStations());
-        System.out.println("SHORTEST : " + shortest.getStops() + " stops, " + shortest.getTime() + " min, " + shortest.getDistance() + " km | Path: " + shortest.getStations());
-        System.out.println("Time savings  (Fastest - Shortest): " + (shortest.getTime() - fast.getTime()) + " min");
-        System.out.println("Distance saved (Shortest - Fastest): " + Math.round((fast.getDistance() - shortest.getDistance()) * 10.0) / 10.0 + " km");
     }
 
-    /**
-     * VIVA TEST 2: Verifies trade-off for Koyambedu -> Airport.
-     * FASTEST:  Koyambedu->...->Vadapalani->Alandur(Orange)     -> fewer stops, faster
-     * SHORTEST: Koyambedu->...->Vadapalani->Ashok Nagar->...->Airport -> shorter distance
-     */
     @Test
     void test8_DijkstraModesDifferentRoutes_KoyambeduToAirport() {
         RouteRequest fastReq = new RouteRequest("Koyambedu", "Chennai International Airport", "FASTEST");
@@ -154,7 +142,6 @@ public class RouteAlgorithmTest {
         assertNotNull(fast);
         assertNotNull(shortest);
 
-        // The two modes must produce different routes
         assertNotEquals(fast.getStations(), shortest.getStations(),
             "FASTEST and SHORTEST_DISTANCE must return different routes for Koyambedu->Airport");
 
@@ -162,11 +149,147 @@ public class RouteAlgorithmTest {
             "Fastest route must have lower travel time");
         assertTrue(shortest.getDistance() < fast.getDistance(),
             "Shortest-distance route must have lower km");
+    }
 
-        System.out.println("=== VIVA DEMO: Dijkstra Mode Comparison (Koyambedu -> Airport) ===");
-        System.out.println("FASTEST  : " + fast.getStops() + " stops, " + fast.getTime() + " min, " + fast.getDistance() + " km | Path: " + fast.getStations());
-        System.out.println("SHORTEST : " + shortest.getStops() + " stops, " + shortest.getTime() + " min, " + shortest.getDistance() + " km | Path: " + shortest.getStations());
+    // ==========================================
+    // VISUALIZATION UNIT TESTS
+    // ==========================================
+
+    @Test
+    void test9_DijkstraTimeVisualizationEvents() {
+        RouteRequest req = new RouteRequest("Chennai Central", "Chennai International Airport", "FASTEST");
+        VisualizationResult vis = routeService.visualizeRoute(req);
+
+        assertNotNull(vis);
+        assertEquals("Dijkstra", vis.getAlgorithm());
+        assertEquals("Travel Time", vis.getOptimization());
+        assertEquals("min", vis.getWeightUnit());
+        assertEquals("Chennai Central", vis.getSource());
+        assertEquals("Chennai International Airport", vis.getDestination());
+        assertTrue(vis.getTotalSteps() > 10, "Should generate detailed execution steps");
+
+        List<AlgorithmEvent> events = vis.getEvents();
+        assertFalse(events.isEmpty());
+
+        // Step 1 must be START with source station
+        AlgorithmEvent firstEvent = events.get(0);
+        assertEquals(AlgorithmEvent.EventType.START, firstEvent.getType());
+        assertEquals("Chennai Central", firstEvent.getCurrentStationName());
+        assertEquals(0.0, firstEvent.getCurrentCost());
+        assertNotNull(firstEvent.getQueueSnapshot());
+        assertEquals(1, firstEvent.getQueueSnapshot().size());
+
+        // Must have relaxation events
+        boolean hasRelaxation = events.stream().anyMatch(e -> e.getType() == AlgorithmEvent.EventType.RELAX_SUCCESS && e.isRelaxed());
+        assertTrue(hasRelaxation, "Dijkstra visualization must contain RELAX_SUCCESS events");
+
+        // Must reach destination
+        boolean reachedDest = events.stream().anyMatch(e -> e.getType() == AlgorithmEvent.EventType.DESTINATION_REACHED);
+        assertTrue(reachedDest, "Dijkstra visualization must record DESTINATION_REACHED");
+
+        // Must backtrack
+        boolean hasBacktrack = events.stream().anyMatch(e -> e.getType() == AlgorithmEvent.EventType.BACKTRACK_STEP);
+        assertTrue(hasBacktrack, "Dijkstra visualization must contain BACKTRACK_STEP events");
+
+        // Final event must be FINAL_PATH_READY
+        AlgorithmEvent lastEvent = events.get(events.size() - 1);
+        assertEquals(AlgorithmEvent.EventType.FINAL_PATH_READY, lastEvent.getType());
+        assertNotNull(lastEvent.getCurrentPathSnapshot());
+        assertEquals(vis.getFinalPath(), lastEvent.getCurrentPathSnapshot());
+
+        // Final result matches standard calculation
+        RouteResult standard = routeService.calculateRoute(req);
+        assertEquals(standard.getStations(), vis.getFinalPath());
+        assertEquals(standard.getTime(), vis.getRouteResult().getTime());
+        assertEquals(standard.getDistance(), vis.getRouteResult().getDistance());
+        assertEquals(standard.getStops(), vis.getRouteResult().getStops());
+
+        // Verify backtrack path starts at Airport and ends at Central
+        assertEquals("Chennai International Airport", vis.getBacktrackPath().get(0));
+        assertEquals("Chennai Central", vis.getBacktrackPath().get(vis.getBacktrackPath().size() - 1));
+    }
+
+    @Test
+    void test10_DijkstraDistanceVisualizationEvents() {
+        RouteRequest req = new RouteRequest("Chennai Central", "Chennai International Airport", "SHORTEST_DISTANCE");
+        VisualizationResult vis = routeService.visualizeRoute(req);
+
+        assertNotNull(vis);
+        assertEquals("Dijkstra", vis.getAlgorithm());
+        assertEquals("Shortest Distance", vis.getOptimization());
+        assertEquals("km", vis.getWeightUnit());
+
+        RouteResult standard = routeService.calculateRoute(req);
+        assertEquals(standard.getStations(), vis.getFinalPath());
+        assertEquals(10, vis.getRouteResult().getStops());
+        assertEquals(15.4, vis.getRouteResult().getDistance(), 0.1);
+        assertEquals(24, vis.getRouteResult().getTime());
+    }
+
+    @Test
+    void test11_BFSVisualizationEvents() {
+        RouteRequest req = new RouteRequest("Chennai Central", "Chennai International Airport", "FEWEST_STOPS");
+        VisualizationResult vis = routeService.visualizeRoute(req);
+
+        assertNotNull(vis);
+        assertEquals("BFS", vis.getAlgorithm());
+        assertEquals("Fewest Stops", vis.getOptimization());
+        assertEquals("stops", vis.getWeightUnit());
+
+        List<AlgorithmEvent> events = vis.getEvents();
+        assertFalse(events.isEmpty());
+
+        AlgorithmEvent firstEvent = events.get(0);
+        assertEquals(AlgorithmEvent.EventType.START, firstEvent.getType());
+        assertEquals("Chennai Central", firstEvent.getCurrentStationName());
+        assertEquals(0, firstEvent.getCurrentLevel());
+
+        // Must have ENQUEUE events
+        boolean hasEnqueue = events.stream().anyMatch(e -> e.getType() == AlgorithmEvent.EventType.ENQUEUE);
+        assertTrue(hasEnqueue, "BFS visualization must emit ENQUEUE events");
+
+        // Must reach destination
+        boolean reachedDest = events.stream().anyMatch(e -> e.getType() == AlgorithmEvent.EventType.DESTINATION_REACHED);
+        assertTrue(reachedDest, "BFS visualization must record DESTINATION_REACHED");
+
+        // Verify backtrack
+        boolean hasBacktrack = events.stream().anyMatch(e -> e.getType() == AlgorithmEvent.EventType.BACKTRACK_STEP);
+        assertTrue(hasBacktrack, "BFS visualization must contain BACKTRACK_STEP events");
+
+        RouteResult standard = routeService.calculateRoute(req);
+        assertEquals(standard.getStations(), vis.getFinalPath());
+        assertEquals(standard.getStops(), vis.getRouteResult().getStops());
+    }
+
+    @Test
+    void test12_VisualizationErrorHandling() {
+        RouteRequest sameReq = new RouteRequest("Guindy", "Guindy", "FASTEST");
+        assertThrows(IllegalArgumentException.class, () -> routeService.visualizeRoute(sameReq));
+
+        RouteRequest nullReq = new RouteRequest("", "Airport", "FASTEST");
+        assertThrows(IllegalArgumentException.class, () -> routeService.visualizeRoute(nullReq));
+
+        RouteRequest invalidStation = new RouteRequest("Atlantis", "Guindy", "FASTEST");
+        assertThrows(IllegalArgumentException.class, () -> routeService.visualizeRoute(invalidStation));
+    }
+
+    @Test
+    void test13_DemoCase2_KoyambeduToAirportVisualization() {
+        RouteRequest fastReq = new RouteRequest("Koyambedu", "Chennai International Airport", "FASTEST");
+        VisualizationResult fastVis = routeService.visualizeRoute(fastReq);
+        assertEquals(6, fastVis.getRouteResult().getStops());
+        assertEquals(18, fastVis.getRouteResult().getTime());
+        assertEquals(13.7, fastVis.getRouteResult().getDistance(), 0.1);
+
+        RouteRequest distReq = new RouteRequest("Koyambedu", "Chennai International Airport", "SHORTEST_DISTANCE");
+        VisualizationResult distVis = routeService.visualizeRoute(distReq);
+        assertEquals(8, distVis.getRouteResult().getStops());
+        assertEquals(20, distVis.getRouteResult().getTime());
+        assertEquals(12.3, distVis.getRouteResult().getDistance(), 0.1);
+
+        RouteRequest bfsReq = new RouteRequest("Koyambedu", "Chennai International Airport", "FEWEST_STOPS");
+        VisualizationResult bfsVis = routeService.visualizeRoute(bfsReq);
+        assertEquals(6, bfsVis.getRouteResult().getStops());
+        assertEquals(18, bfsVis.getRouteResult().getTime());
     }
 }
-
-

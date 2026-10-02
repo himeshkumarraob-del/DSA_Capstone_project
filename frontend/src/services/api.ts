@@ -34,6 +34,62 @@ export interface RouteResult {
 
 export type RoutePreference = 'FASTEST' | 'SHORTEST_DISTANCE' | 'FEWEST_STOPS';
 
+export interface QueueItem {
+  stationId: number;
+  stationName: string;
+  cost: number;
+  level: number;
+  line: string;
+}
+
+export type AlgorithmEventType =
+  | 'START'
+  | 'PROCESS_STATION'
+  | 'EXAMINE_NEIGHBOR'
+  | 'RELAX_SUCCESS'
+  | 'RELAX_SKIPPED'
+  | 'ENQUEUE'
+  | 'ALREADY_VISITED'
+  | 'DESTINATION_REACHED'
+  | 'BACKTRACK_STEP'
+  | 'FINAL_PATH_READY';
+
+export interface AlgorithmEvent {
+  step: number;
+  type: AlgorithmEventType;
+  currentStationId: number;
+  currentStationName: string;
+  currentCost: number;
+  currentLevel: number;
+  neighborStationId?: number;
+  neighborStationName?: string;
+  edgeWeight?: number;
+  edgeLine?: string;
+  oldCost?: number;
+  newCost?: number;
+  relaxed: boolean;
+  queueSnapshot?: QueueItem[];
+  visitedStations?: string[];
+  parentMap?: Record<string, string>;
+  currentPathSnapshot?: string[];
+  description: string;
+}
+
+export interface VisualizationResult {
+  algorithm: string;
+  optimization: string;
+  weightUnit: string;
+  source: string;
+  destination: string;
+  totalSteps: number;
+  events: AlgorithmEvent[];
+  backtrackPath: string[];
+  finalPath: string[];
+  routeResult: RouteResult;
+  timeComplexity: string;
+  spaceComplexity: string;
+}
+
 const API_BASE_URL = 'http://localhost:8080/api';
 
 /**
@@ -54,7 +110,7 @@ export async function fetchStations(): Promise<Station[]> {
 }
 
 /**
- * Query route calculation from the Java backend using Graph + BFS / Dijkstra.
+ * Query standard route calculation from the Java backend using Graph + BFS / Dijkstra.
  */
 export async function findRoute(
   source: string,
@@ -83,6 +139,40 @@ export async function findRoute(
     return data as RouteResult;
   } catch (error) {
     console.error('Error finding route:', error);
+    throw error;
+  }
+}
+
+/**
+ * Query step-by-step algorithm visualization from Java backend.
+ */
+export async function visualizeRoute(
+  source: string,
+  destination: string,
+  preference: RoutePreference
+): Promise<VisualizationResult> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/route/visualize`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        source,
+        destination,
+        preference,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || `Error ${response.status}: Failed to calculate visualization`);
+    }
+
+    return data as VisualizationResult;
+  } catch (error) {
+    console.error('Error visualizing route:', error);
     throw error;
   }
 }

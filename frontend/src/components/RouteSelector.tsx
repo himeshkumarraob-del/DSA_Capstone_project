@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Station, RoutePreference } from '../services/api';
-import { ArrowUpDown, Zap, Ruler, GitCommit, Search, Sparkles } from 'lucide-react';
+import { ArrowUpDown, Zap, Ruler, GitCommit, Search, Sparkles, Eye } from 'lucide-react';
 
 interface RouteSelectorProps {
   stations: Station[];
@@ -8,11 +8,13 @@ interface RouteSelectorProps {
   destination: string;
   preference: RoutePreference;
   loading: boolean;
+  visualizing: boolean;
   onSourceChange: (station: string) => void;
   onDestinationChange: (station: string) => void;
   onPreferenceChange: (pref: RoutePreference) => void;
   onSwapStations: () => void;
   onSubmit: (e: React.FormEvent) => void;
+  onStartVisualization: () => void;
   onSelectPreset: (src: string, dest: string, pref: RoutePreference) => void;
 }
 
@@ -22,11 +24,13 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
   destination,
   preference,
   loading,
+  visualizing,
   onSourceChange,
   onDestinationChange,
   onPreferenceChange,
   onSwapStations,
   onSubmit,
+  onStartVisualization,
   onSelectPreset,
 }) => {
   return (
@@ -87,7 +91,7 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
                 type="button"
                 onClick={onSwapStations}
                 title="Swap Source and Destination"
-                className="p-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white border border-gray-700 hover:border-gray-600 transition-colors shadow-sm"
+                className="p-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white border border-gray-700 hover:border-gray-600 transition-colors shadow-sm cursor-pointer"
               >
                 <ArrowUpDown className="w-4 h-4" />
               </button>
@@ -133,7 +137,7 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
               <button
                 type="button"
                 onClick={() => onPreferenceChange('FASTEST')}
-                className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${
+                className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
                   preference === 'FASTEST'
                     ? 'bg-blue-600/15 border-blue-500 text-white shadow-md shadow-blue-500/10'
                     : 'bg-gray-950/60 border-gray-800 text-gray-400 hover:border-gray-700 hover:text-gray-300'
@@ -148,7 +152,7 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
                 </div>
                 <div>
                   <div className="text-sm font-semibold">Fastest Route</div>
-                  <div className="text-[11px] text-gray-400">Dijkstra (Time weight)</div>
+                  <div className="text-[11px] text-gray-400">Dijkstra (Travel Time)</div>
                 </div>
               </button>
 
@@ -156,7 +160,7 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
               <button
                 type="button"
                 onClick={() => onPreferenceChange('SHORTEST_DISTANCE')}
-                className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${
+                className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
                   preference === 'SHORTEST_DISTANCE'
                     ? 'bg-emerald-600/15 border-emerald-500 text-white shadow-md shadow-emerald-500/10'
                     : 'bg-gray-950/60 border-gray-800 text-gray-400 hover:border-gray-700 hover:text-gray-300'
@@ -173,7 +177,7 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
                 </div>
                 <div>
                   <div className="text-sm font-semibold">Shortest Distance</div>
-                  <div className="text-[11px] text-gray-400">Dijkstra (Track km)</div>
+                  <div className="text-[11px] text-gray-400">Dijkstra (Physical Distance)</div>
                 </div>
               </button>
 
@@ -181,7 +185,7 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
               <button
                 type="button"
                 onClick={() => onPreferenceChange('FEWEST_STOPS')}
-                className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${
+                className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
                   preference === 'FEWEST_STOPS'
                     ? 'bg-purple-600/15 border-purple-500 text-white shadow-md shadow-purple-500/10'
                     : 'bg-gray-950/60 border-gray-800 text-gray-400 hover:border-gray-700 hover:text-gray-300'
@@ -204,22 +208,43 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
             </div>
           </div>
 
-          {/* Action Button */}
-          <div className="pt-2">
+          {/* Action Buttons: Find Route AND Visualize Algorithm */}
+          <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Button 1: Standard Find Route */}
             <button
               type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-600 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-blue-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-sm uppercase tracking-wider"
+              disabled={loading || visualizing}
+              className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-600 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-blue-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm uppercase tracking-wider"
             >
               {loading ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Computing Optimal Route...</span>
+                  <span>Computing...</span>
                 </>
               ) : (
                 <>
                   <Search className="w-4 h-4" />
                   <span>Find Route</span>
+                </>
+              )}
+            </button>
+
+            {/* Button 2: Visualize Algorithm (Step-by-Step Educational Explorer) */}
+            <button
+              type="button"
+              onClick={onStartVisualization}
+              disabled={loading || visualizing}
+              className="w-full bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-500 hover:to-orange-600 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-orange-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm uppercase tracking-wider"
+            >
+              {visualizing ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Initializing DSA...</span>
+                </>
+              ) : (
+                <>
+                  <Eye className="w-4 h-4" />
+                  <span>Visualize Algorithm</span>
                 </>
               )}
             </button>
@@ -236,30 +261,30 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
             <button
               type="button"
               onClick={() => onSelectPreset('Chennai Central', 'Chennai International Airport', 'FASTEST')}
-              className="text-xs bg-gray-800/80 hover:bg-gray-700 text-gray-200 px-3 py-1.5 rounded-lg border border-gray-700/60 transition-colors"
+              className="text-xs bg-gray-800/80 hover:bg-gray-700 text-gray-200 px-3 py-1.5 rounded-lg border border-gray-700/60 transition-colors cursor-pointer"
             >
-              Central ➔ Airport (Blue Line)
+              Case 1: Central ➔ Airport (Fastest)
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectPreset('Chennai Central', 'Chennai International Airport', 'SHORTEST_DISTANCE')}
+              className="text-xs bg-gray-800/80 hover:bg-gray-700 text-gray-200 px-3 py-1.5 rounded-lg border border-gray-700/60 transition-colors cursor-pointer"
+            >
+              Case 1: Central ➔ Airport (Shortest)
             </button>
             <button
               type="button"
               onClick={() => onSelectPreset('Koyambedu', 'Chennai International Airport', 'FASTEST')}
-              className="text-xs bg-gray-800/80 hover:bg-gray-700 text-gray-200 px-3 py-1.5 rounded-lg border border-gray-700/60 transition-colors"
+              className="text-xs bg-gray-800/80 hover:bg-gray-700 text-gray-200 px-3 py-1.5 rounded-lg border border-gray-700/60 transition-colors cursor-pointer"
             >
-              Koyambedu ➔ Airport (Interchange)
-            </button>
-            <button
-              type="button"
-              onClick={() => onSelectPreset('Vadapalani', 'Thousand Lights', 'FASTEST')}
-              className="text-xs bg-gray-800/80 hover:bg-gray-700 text-gray-200 px-3 py-1.5 rounded-lg border border-gray-700/60 transition-colors"
-            >
-              Vadapalani ➔ Thousand Lights
+              Case 2: Koyambedu ➔ Airport (Interchange)
             </button>
             <button
               type="button"
               onClick={() => onSelectPreset('Madhavaram', 'Adyar Depot', 'FEWEST_STOPS')}
-              className="text-xs bg-gray-800/80 hover:bg-gray-700 text-gray-200 px-3 py-1.5 rounded-lg border border-gray-700/60 transition-colors"
+              className="text-xs bg-gray-800/80 hover:bg-gray-700 text-gray-200 px-3 py-1.5 rounded-lg border border-gray-700/60 transition-colors cursor-pointer"
             >
-              Madhavaram ➔ Adyar Depot (Purple Line)
+              Madhavaram ➔ Adyar (BFS Fewest Stops)
             </button>
           </div>
         </div>
